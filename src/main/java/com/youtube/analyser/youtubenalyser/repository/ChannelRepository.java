@@ -1,6 +1,6 @@
 package com.youtube.analyser.youtubenalyser.repository;
 
-import com.youtube.analyser.youtubenalyser.model.YTChannel;
+import com.youtube.analyser.youtubenalyser.model.channel.YTChannel;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.Optional;

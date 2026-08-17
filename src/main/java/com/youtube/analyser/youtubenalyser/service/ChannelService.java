@@ -2,7 +2,7 @@ package com.youtube.analyser.youtubenalyser.service;
 
 import com.youtube.analyser.youtubenalyser.client.YouTubeClient;
 import com.youtube.analyser.youtubenalyser.exception.NoSuchChannelException;
-import com.youtube.analyser.youtubenalyser.model.*;
+import com.youtube.analyser.youtubenalyser.model.channel.*;
 import com.youtube.analyser.youtubenalyser.repository.ChannelRepository;
 import com.youtube.analyser.youtubenalyser.repository.YTChannelSnapshotRepository;
 import lombok.AllArgsConstructor;
@@ -95,7 +95,7 @@ public class ChannelService {
                 .toList();
     }
 
-    private String toChannelId(String data){
+    public String toChannelId(String data){
         if(data == null || data.isBlank()){
             return null;
         }
@@ -122,7 +122,9 @@ public class ChannelService {
         }
         if(!missing.isEmpty()){
             for(ChannelResponse resp : youTubeClient.getMultipleChannelData(parts, String.join(",", missing))){
-                result.add(channelRepository.save(toYTChannel(resp)));
+                YTChannel channel = toYTChannel(resp);
+                result.add(channelRepository.save(channel));
+                snapshotRepository.save(new YTChannelSnapshot(channel.getYtId(), channel.getTotalViews(), channel.getSubscribers(), channel.getNumVideos()));
             }
         }
         return result;
@@ -203,5 +205,10 @@ public class ChannelService {
         return uploads / (months * 1.0);
     }
 
+    public String getUploadsPlaylistId(String channelInput){
+        String id = toChannelId(channelInput);
+        ChannelDTO channel = getChannelDataWithId(id);
+        return channel.getUploadedVidsPlaylistId();
+    }
 
 }

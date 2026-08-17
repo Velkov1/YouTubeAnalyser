@@ -1,5 +1,6 @@
-package com.youtube.analyser.youtubenalyser.model;
+package com.youtube.analyser.youtubenalyser.model.video;
 
+import com.youtube.analyser.youtubenalyser.model.channel.Thumbnail;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 

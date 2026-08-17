@@ -1,5 +1,6 @@
-package com.youtube.analyser.youtubenalyser.model;
+package com.youtube.analyser.youtubenalyser.model.video;
 
+import com.youtube.analyser.youtubenalyser.model.channel.Thumbnail;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -7,7 +8,6 @@ import lombok.Setter;
 
 import java.time.Instant;
 import java.util.List;
-import java.util.Map;
 
 @Entity
 @Table(name = "youtube video")

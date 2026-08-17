@@ -2,16 +2,18 @@ package com.youtube.analyser.youtubenalyser.client;
 
 import com.youtube.analyser.youtubenalyser.exception.NoSuchChannelException;
 import com.youtube.analyser.youtubenalyser.exception.NoSuchVideoException;
-import com.youtube.analyser.youtubenalyser.model.ChannelListResponse;
-import com.youtube.analyser.youtubenalyser.model.ChannelResponse;
-import com.youtube.analyser.youtubenalyser.model.VideoListResponse;
-import com.youtube.analyser.youtubenalyser.model.VideoResponse;
+import com.youtube.analyser.youtubenalyser.model.channel.ChannelListResponse;
+import com.youtube.analyser.youtubenalyser.model.channel.ChannelResponse;
+import com.youtube.analyser.youtubenalyser.model.playlist.PlaylistItemListResponse;
+import com.youtube.analyser.youtubenalyser.model.video.VideoListResponse;
+import com.youtube.analyser.youtubenalyser.model.video.VideoResponse;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 
 import java.util.List;
+import java.util.Optional;
 
 @Component
 public class YouTubeClient {
@@ -92,4 +94,34 @@ public class YouTubeClient {
         }
         return response.getItems().get(0);
     }
+    public List<VideoResponse> getMultipleVideoData(String parts, String ids){
+        VideoListResponse response = restClient.get()
+                .uri(uriBuilder -> uriBuilder
+                        .path("/videos")
+                        .queryParam("part", parts)
+                        .queryParam("id", ids)
+                        .queryParam("key", key)
+                        .build())
+                .retrieve()
+                .body(VideoListResponse.class);
+        if(response == null || response.getItems() == null){
+            return  List.of();
+        }
+        return response.getItems();
+    }
+
+    public PlaylistItemListResponse getPlaylistItemResponse(String playlistId, String nextPageToken){
+        return restClient.get()
+                .uri(uriBuilder -> uriBuilder
+                        .path("/playlistItems")
+                        .queryParam("part", "snippet")
+                        .queryParam("playlistId", playlistId)
+                        .queryParam("maxResults", 50)
+                        .queryParamIfPresent("pageToken", Optional.ofNullable(nextPageToken))
+                        .queryParam("key", key)
+                        .build())
+                .retrieve()
+                .body(PlaylistItemListResponse.class);
+    }
+
 }

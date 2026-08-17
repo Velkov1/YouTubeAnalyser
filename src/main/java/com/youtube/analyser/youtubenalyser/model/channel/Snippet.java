@@ -1,4 +1,4 @@
-package com.youtube.analyser.youtubenalyser.model;
+package com.youtube.analyser.youtubenalyser.model.channel;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import lombok.Data;
