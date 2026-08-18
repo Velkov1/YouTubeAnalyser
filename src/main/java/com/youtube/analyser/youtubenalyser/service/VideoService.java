@@ -1,6 +1,7 @@
 package com.youtube.analyser.youtubenalyser.service;
 
 import com.youtube.analyser.youtubenalyser.client.YouTubeClient;
+import com.youtube.analyser.youtubenalyser.exception.InvalidRegionException;
 import com.youtube.analyser.youtubenalyser.exception.NoSuchChannelException;
 import com.youtube.analyser.youtubenalyser.exception.NoSuchVideoException;
 import com.youtube.analyser.youtubenalyser.model.channel.ChannelDTO;
@@ -8,6 +9,7 @@ import com.youtube.analyser.youtubenalyser.model.channel.ChannelUploadsCache;
 import com.youtube.analyser.youtubenalyser.model.channel.YTChannel;
 import com.youtube.analyser.youtubenalyser.model.playlist.PlaylistItem;
 import com.youtube.analyser.youtubenalyser.model.playlist.PlaylistItemListResponse;
+import com.youtube.analyser.youtubenalyser.model.region.RegionCodeCache;
 import com.youtube.analyser.youtubenalyser.model.video.VideoDTO;
 import com.youtube.analyser.youtubenalyser.model.video.VideoResponse;
 import com.youtube.analyser.youtubenalyser.model.video.YTVideo;
@@ -30,6 +32,7 @@ public class VideoService {
     private final YTVideoSnapshotRepository snapshotRepository;
     private final YouTubeClient youTubeClient;
     private final ChannelService channelService;
+    private final RegionCodeCache regionCodeCache;
     private final ChannelUploadsCacheRepository channelUploadsCacheRepository;
     private final String parts = "snippet, contentDetails, status, statistics, hasPaidProductPlacementDetails";
 
@@ -404,6 +407,19 @@ public class VideoService {
 
         return bestLength / totalLength;
     }
+
+    public List<VideoDTO> trending(String regionCode){
+        if(!regionCodeCache.isValid(regionCode)){
+            throw new InvalidRegionException("Invalid region code: " + regionCode);
+        }
+
+    }
+
+    public List<VideoDTO> trendingInCategory(String regionCode, String categoryId){
+
+    }
+
+
 
 
 }

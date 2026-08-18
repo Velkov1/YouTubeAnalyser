@@ -5,6 +5,8 @@ import com.youtube.analyser.youtubenalyser.exception.NoSuchVideoException;
 import com.youtube.analyser.youtubenalyser.model.channel.ChannelListResponse;
 import com.youtube.analyser.youtubenalyser.model.channel.ChannelResponse;
 import com.youtube.analyser.youtubenalyser.model.playlist.PlaylistItemListResponse;
+import com.youtube.analyser.youtubenalyser.model.region.I18nRegionListResponse;
+import com.youtube.analyser.youtubenalyser.model.region.I18nRegionsResponse;
 import com.youtube.analyser.youtubenalyser.model.video.VideoListResponse;
 import com.youtube.analyser.youtubenalyser.model.video.VideoResponse;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -122,6 +124,21 @@ public class YouTubeClient {
                         .build())
                 .retrieve()
                 .body(PlaylistItemListResponse.class);
+    }
+
+    public I18nRegionListResponse getI18nRegions(){
+        return restClient.get()
+                .uri(uriBuilder -> uriBuilder
+                        .path("/i18nRegions")
+                        .queryParam("part", "snippet")
+                        .queryParam("key", key)
+                        .build())
+                .retrieve()
+                .body(I18nRegionListResponse.class);
+    }
+
+    public List<VideoResponse> getTrending(){
+
     }
 
 }
