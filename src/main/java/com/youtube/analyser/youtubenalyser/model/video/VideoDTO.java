@@ -10,6 +10,8 @@ import java.util.List;
 @Data
 @AllArgsConstructor
 public class VideoDTO {
+
+    private String videoId;
     private Instant savedToRepo;
     private Instant publishedAt;
     private String channelId;

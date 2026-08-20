@@ -2,12 +2,14 @@ package com.youtube.analyser.youtubenalyser.model.channel;
 
 import jakarta.persistence.*;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 
 import java.time.Instant;
 import java.util.List;
 
 @Data
 @Entity
+@NoArgsConstructor
 public class ChannelUploadsCache {
     @Id
     private String channelId;

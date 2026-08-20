@@ -1,19 +1,18 @@
 package com.youtube.analyser.youtubenalyser.service;
 
 import com.youtube.analyser.youtubenalyser.client.YouTubeClient;
+import com.youtube.analyser.youtubenalyser.exception.InvalidCategoryIdException;
 import com.youtube.analyser.youtubenalyser.exception.InvalidRegionException;
 import com.youtube.analyser.youtubenalyser.exception.NoSuchChannelException;
 import com.youtube.analyser.youtubenalyser.exception.NoSuchVideoException;
 import com.youtube.analyser.youtubenalyser.model.channel.ChannelDTO;
 import com.youtube.analyser.youtubenalyser.model.channel.ChannelUploadsCache;
-import com.youtube.analyser.youtubenalyser.model.channel.YTChannel;
 import com.youtube.analyser.youtubenalyser.model.playlist.PlaylistItem;
 import com.youtube.analyser.youtubenalyser.model.playlist.PlaylistItemListResponse;
 import com.youtube.analyser.youtubenalyser.model.region.RegionCodeCache;
-import com.youtube.analyser.youtubenalyser.model.video.VideoDTO;
-import com.youtube.analyser.youtubenalyser.model.video.VideoResponse;
-import com.youtube.analyser.youtubenalyser.model.video.YTVideo;
-import com.youtube.analyser.youtubenalyser.model.video.YTVideoSnapshot;
+import com.youtube.analyser.youtubenalyser.model.video.*;
+import com.youtube.analyser.youtubenalyser.model.videoCategory.VideoCategoryCache;
+import com.youtube.analyser.youtubenalyser.model.videoCategory.VideoCategoryResponse;
 import com.youtube.analyser.youtubenalyser.repository.ChannelUploadsCacheRepository;
 import com.youtube.analyser.youtubenalyser.repository.VideoRepository;
 import com.youtube.analyser.youtubenalyser.repository.YTVideoSnapshotRepository;
@@ -33,6 +32,7 @@ public class VideoService {
     private final YouTubeClient youTubeClient;
     private final ChannelService channelService;
     private final RegionCodeCache regionCodeCache;
+    private final VideoCategoryCache videoCategoryCache;
     private final ChannelUploadsCacheRepository channelUploadsCacheRepository;
     private final String parts = "snippet, contentDetails, status, statistics, hasPaidProductPlacementDetails";
 
@@ -69,6 +69,7 @@ public class VideoService {
     }
     private VideoDTO toYTVideoDTO(YTVideo video){
         return new VideoDTO(
+                video.getVideoId(),
                 video.getSavedToRepo(),
                 video.getPublishedAt(), video.getChannelId(), video.getVideoTitle(), video.getVideoDescription(), video.getThumbnails(), video.getChannelTitle(), video.getTags(), video.getCategoryId(), video.getLiveBroadcastContent(), video.getDefaultLanguage(),
                 video.getDuration(), video.getDefinition(), video.getCaption(),
@@ -95,7 +96,7 @@ public class VideoService {
                 .toList();
     }
 
-    private String toVideoId(String data){
+    public String toVideoId(String data){
         if(data == null || data.isBlank()){
             throw new NoSuchVideoException("No video input provided");
         }
@@ -138,7 +139,7 @@ public class VideoService {
 
 
     //fetch the playlist with all videos of a channel
-    private List<VideoDTO> getChannelVideos(String channelInput){
+    public List<VideoDTO> getChannelVideos(String channelInput){
         String channelId = channelService.toChannelId(channelInput);
         if(channelId == null){
             throw new NoSuchChannelException("Could not find channel " + channelId);
@@ -412,11 +413,181 @@ public class VideoService {
         if(!regionCodeCache.isValid(regionCode)){
             throw new InvalidRegionException("Invalid region code: " + regionCode);
         }
-
+        return youTubeClient.getTrending(parts, regionCode).stream()
+                .map(this::toYTVideo)
+                .map(this::toYTVideoDTO)
+                .toList();
     }
 
     public List<VideoDTO> trendingInCategory(String regionCode, String categoryId){
+        if(!regionCodeCache.isValid(regionCode)){
+            throw new InvalidRegionException("Invalid region code: " + regionCode);
+        }
 
+        if(!videoCategoryCache.isValid(regionCode, categoryId)){
+            throw new InvalidCategoryIdException("Invalid category id:" + categoryId + " for region " + regionCode);
+        }
+        return youTubeClient.getTrendingByCategory(parts, regionCode, categoryId)
+                .stream()
+                .map(this::toYTVideo)
+                .map(this::toYTVideoDTO)
+                .toList();
+    }
+
+    //some other more precise statistics
+    public long viewIncreaseFromLastSnippet(String videoInput){
+        String videoId = toVideoId(videoInput);
+        getOrCreateVideo(videoId);
+        List<YTVideoSnapshot> lastTwo = snapshotRepository.findFirst2ByVideoIdOrderByFetchedAtDesc(videoId);
+        if(lastTwo.size() < 2){
+            return 0;
+        }
+        return lastTwo.get(0).getViewCount() - lastTwo.get(1).getViewCount();
+    }
+
+    public double averageViewsVelocity(String videoInput){
+        String videoId = toVideoId(videoInput);
+        getOrCreateVideo(videoId);
+        return averageViewsVelocityComputation(videoId);
+    }
+
+    private double averageViewsVelocityComputation(String videoId){
+        List<YTVideoSnapshot> list = getFirstAndLast(videoId);
+        if(list.isEmpty()){
+            return 0.0;
+        }
+        YTVideoSnapshot first = list.get(0);
+        YTVideoSnapshot last = list.get(1);
+        double daysElapsed = daysElapsed(first.getFetchedAt(), last.getFetchedAt());
+        if(daysElapsed <= 0){
+            return 0.0;
+        }
+        return (last.getViewCount() - first.getViewCount()) / daysElapsed;
+    }
+
+
+
+    private List<YTVideoSnapshot> getFirstAndLast(String videoId){
+        Optional<YTVideoSnapshot> firstOpt = snapshotRepository.findFirstByVideoIdOrderByFetchedAtAsc(videoId);
+        Optional<YTVideoSnapshot> lastOpt = snapshotRepository.findFirstByVideoIdOrderByFetchedAtDesc(videoId);
+        if(firstOpt.isEmpty() || lastOpt.isEmpty()){
+            return List.of();
+        }
+        YTVideoSnapshot first = firstOpt.get();
+        YTVideoSnapshot last = lastOpt.get();
+        List<YTVideoSnapshot> list = new ArrayList<>();
+        list.add(first);
+        list.add(last);
+        return list;
+    }
+
+    private double daysElapsed(Instant startDate, Instant endDate){
+        return Duration.between(startDate, endDate).toSeconds()/86400.0;
+
+    }
+    public double averageCommentVelocity(String videoInput){
+        String videoId = toVideoId(videoInput);
+        getOrCreateVideo(videoId);
+        List<YTVideoSnapshot> list = getFirstAndLast(videoId);
+        if(list.isEmpty()){
+            return 0.0;
+        }
+        YTVideoSnapshot first = list.get(0);
+        YTVideoSnapshot last = list.get(1);
+        double daysElapsed = daysElapsed(first.getFetchedAt(), last.getFetchedAt());
+        if(daysElapsed <= 0){
+            return 0.0;
+        }
+        return (last.getCommentCount() - first.getCommentCount())/daysElapsed;
+
+    }
+
+    public double averageLikesVelocity(String videoInput){
+        String videoId = toVideoId(videoInput);
+        getOrCreateVideo(videoId);
+        List<YTVideoSnapshot> list = getFirstAndLast(videoId);
+        if(list.isEmpty()){
+            return 0.0;
+        }
+        YTVideoSnapshot first = list.get(0);
+        YTVideoSnapshot last = list.get(1);
+        double daysElapsed = daysElapsed(first.getFetchedAt(), last.getFetchedAt());
+        if(daysElapsed <= 0){
+            return 0.0;
+        }
+        return (last.getLikeCount() - first.getLikeCount())/daysElapsed;
+    }
+
+    // return the momentum difference of the views increase from the last 2 snapshots compared to the last 2 before that
+    public double momentum(String videoInput){
+        String videoId = toVideoId(videoInput);
+        getOrCreateVideo(videoId);
+        List<YTVideoSnapshot> lastTwoSnapshots = snapshotRepository.findFirst4ByVideoIdOrderByFetchedAtDesc(videoId);
+        if(lastTwoSnapshots.size() < 4){
+            return 0;
+        }
+        long firstDifference = getDifferenceBetweenSnapshots(lastTwoSnapshots.get(0), lastTwoSnapshots.get(1));
+        long secondDifference = getDifferenceBetweenSnapshots(lastTwoSnapshots.get(2), lastTwoSnapshots.get(3));
+        double firstDaysElapsed = daysElapsed(lastTwoSnapshots.get(1).getFetchedAt(), lastTwoSnapshots.get(0).getFetchedAt());
+        if(firstDaysElapsed <= 0){
+            return 0.0;
+        }
+        double secondDaysElapsed = daysElapsed(lastTwoSnapshots.get(3).getFetchedAt(), lastTwoSnapshots.get(2).getFetchedAt());
+        if(secondDaysElapsed <= 0){
+            return 0.0;
+        }
+        double averageVelocityFirst =  firstDifference / firstDaysElapsed;
+        double averageVelocitySecond = secondDifference / secondDaysElapsed;
+        return averageVelocityFirst - averageVelocitySecond;
+    }
+
+
+    private long getDifferenceBetweenSnapshots(YTVideoSnapshot first, YTVideoSnapshot last){
+        return first.getViewCount() - last.getViewCount();
+    }
+
+    //return list of video snapshots ever made for the given video
+    public List<YTVideoSnapshot> growth(String videoInput){
+        String videoId = toVideoId(videoInput);
+        return snapshotRepository.findByVideoIdOrderByFetchedAtDesc(videoId);
+    }
+
+    //return how much time is expected to reach the target views of the video
+    public double daysToMilestone(String videoInput, long target){
+        String videoId = toVideoId(videoInput);
+        VideoDTO video = getVideoDataWithId(videoId);
+        double averageViewsPerDay = averageViewsVelocity(videoId);
+        long currentViews = video.getViewCount();
+        return (target - currentViews) / averageViewsPerDay;
+    }
+
+
+    public boolean isVideoOutperformingTheChannel(String channelInput, String videoInput){
+        List<VideoDTO> channelVideos = getChannelVideos(channelInput);
+        if(channelVideos.isEmpty()){
+            return false;
+        }
+        VideoDTO video = getVideoDataWithId(toVideoId(videoInput));
+        double averageScore = channelVideos.stream()
+                .mapToDouble(this::getVideoScore)
+                .average()
+                .orElse(0.0);
+        return getVideoScore(video) > averageScore;
+    }
+
+    // returns the videos with the highest momentum difference
+    public List<VideoDTO> risingVideos(String channelInput, int limit){
+        if(limit <= 0){
+            return List.of();
+        }
+        List<VideoDTO> channelVideos = getChannelVideos(channelInput);
+        if(channelVideos.isEmpty()){
+            return List.of();
+        }
+        return channelVideos.stream()
+                .sorted(Comparator.comparingDouble((VideoDTO v) -> momentum(v.getVideoId())).reversed())
+                .limit(limit)
+                .toList();
     }
 
 

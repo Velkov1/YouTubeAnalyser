@@ -4,11 +4,14 @@ import com.youtube.analyser.youtubenalyser.exception.NoSuchChannelException;
 import com.youtube.analyser.youtubenalyser.exception.NoSuchVideoException;
 import com.youtube.analyser.youtubenalyser.model.channel.ChannelListResponse;
 import com.youtube.analyser.youtubenalyser.model.channel.ChannelResponse;
+import com.youtube.analyser.youtubenalyser.model.comment.CommentThreadListResponse;
 import com.youtube.analyser.youtubenalyser.model.playlist.PlaylistItemListResponse;
 import com.youtube.analyser.youtubenalyser.model.region.I18nRegionListResponse;
 import com.youtube.analyser.youtubenalyser.model.region.I18nRegionsResponse;
 import com.youtube.analyser.youtubenalyser.model.video.VideoListResponse;
 import com.youtube.analyser.youtubenalyser.model.video.VideoResponse;
+import com.youtube.analyser.youtubenalyser.model.videoCategory.VideoCategoryListResponse;
+import com.youtube.analyser.youtubenalyser.model.videoCategory.VideoCategoryResponse;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -137,8 +140,64 @@ public class YouTubeClient {
                 .body(I18nRegionListResponse.class);
     }
 
-    public List<VideoResponse> getTrending(){
-
+    public List<VideoResponse> getTrending(String parts, String regionCode){
+        VideoListResponse response = restClient.get()
+                .uri(uriBuilder -> uriBuilder
+                        .path("/videos")
+                        .queryParam("part", parts)
+                        .queryParam("chart", "mostPopular")
+                        .queryParam("regionCode", regionCode)
+                        .queryParam("key", key)
+                        .build())
+                .retrieve()
+                .body(VideoListResponse.class);
+        if(response == null || response.getItems() == null){
+            return  List.of();
+        }
+        return response.getItems();
     }
 
+    public List<VideoResponse> getTrendingByCategory(String parts, String regionCode, String categoryId){
+        VideoListResponse response = restClient.get()
+                .uri(uriBuilder -> uriBuilder
+                        .path("/videos")
+                        .queryParam("part", parts)
+                        .queryParam("chart", "mostPopular")
+                        .queryParam("regionCode", regionCode)
+                        .queryParam("videoCategoryId", categoryId)
+                        .queryParam("key", key)
+                        .build())
+                .retrieve()
+                .body(VideoListResponse.class);
+        if(response == null || response.getItems() == null){
+            return  List.of();
+        }
+        return response.getItems();
+    }
+
+    public VideoCategoryListResponse getVideoCategories(String regionCode){
+        return restClient.get()
+                .uri(uriBuilder -> uriBuilder
+                        .path("/videoCategories")
+                        .queryParam("part", "snippet")
+                        .queryParam("regionCode", regionCode)
+                        .queryParam("key", key)
+                        .build())
+                .retrieve()
+                .body(VideoCategoryListResponse.class);
+    }
+
+    public CommentThreadListResponse getCommentThreadsByVideo(String parts, String videoId, String nextPageToken){
+        return restClient.get()
+                .uri(uriBuilder -> uriBuilder
+                        .path("/commentThreads")
+                        .queryParam("part", parts)
+                        .queryParam("videoId", videoId)
+                        .queryParam("maxResults", 100)
+                        .queryParamIfPresent("pageToken", Optional.ofNullable(nextPageToken))
+                        .queryParam("key", key)
+                        .build())
+                .retrieve()
+                .body(CommentThreadListResponse.class);
+    }
 }

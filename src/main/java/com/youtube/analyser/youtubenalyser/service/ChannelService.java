@@ -3,6 +3,7 @@ package com.youtube.analyser.youtubenalyser.service;
 import com.youtube.analyser.youtubenalyser.client.YouTubeClient;
 import com.youtube.analyser.youtubenalyser.exception.NoSuchChannelException;
 import com.youtube.analyser.youtubenalyser.model.channel.*;
+import com.youtube.analyser.youtubenalyser.model.video.VideoDTO;
 import com.youtube.analyser.youtubenalyser.repository.ChannelRepository;
 import com.youtube.analyser.youtubenalyser.repository.YTChannelSnapshotRepository;
 import lombok.AllArgsConstructor;
