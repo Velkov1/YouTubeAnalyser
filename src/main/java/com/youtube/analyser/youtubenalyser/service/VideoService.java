@@ -1,11 +1,9 @@
 package com.youtube.analyser.youtubenalyser.service;
 
 import com.youtube.analyser.youtubenalyser.client.YouTubeClient;
-import com.youtube.analyser.youtubenalyser.exception.InvalidCategoryIdException;
-import com.youtube.analyser.youtubenalyser.exception.InvalidRegionException;
-import com.youtube.analyser.youtubenalyser.exception.NoSuchChannelException;
-import com.youtube.analyser.youtubenalyser.exception.NoSuchVideoException;
+import com.youtube.analyser.youtubenalyser.exception.*;
 import com.youtube.analyser.youtubenalyser.model.channel.ChannelDTO;
+import com.youtube.analyser.youtubenalyser.model.channel.ChannelInsightsDTO;
 import com.youtube.analyser.youtubenalyser.model.channel.ChannelUploadsCache;
 import com.youtube.analyser.youtubenalyser.model.playlist.PlaylistItem;
 import com.youtube.analyser.youtubenalyser.model.playlist.PlaylistItemListResponse;
@@ -69,6 +67,10 @@ public class VideoService {
         );
     }
     private VideoDTO toYTVideoDTO(YTVideo video){
+        long views = video.getViewCount();
+        double likeToViewRatio = views == 0 ? 0.0 : video.getLikeCount() / (double) views;
+        double commentToViewRatio = views == 0 ? 0.0 : video.getCommentCount() / (double) views;
+        long durationInSeconds = durationInSeconds(video.getDuration());
         return new VideoDTO(
                 video.getVideoId(),
                 video.getSavedToRepo(),
@@ -77,8 +79,20 @@ public class VideoService {
                 video.getAllowed(), video.getBlocked(),
                 video.getPrivacyStatus(), video.isMadeForKids(),
                 video.getViewCount(), video.getLikeCount(), video.getCommentCount(),
-                video.isHasPaidProductPlacement()
+                video.isHasPaidProductPlacement(),
+                likeToViewRatio, commentToViewRatio, durationInSeconds
         );
+    }
+
+    private long durationInSeconds(String rawDuration){
+        if(rawDuration == null || rawDuration.isBlank()){
+            return 0;
+        }
+        try{
+            return Duration.parse(rawDuration).getSeconds();
+        } catch (DateTimeParseException e){
+            return 0;
+        }
     }
 
     // fetch by multiple video ids
@@ -217,7 +231,7 @@ public class VideoService {
                 .toList();
     }
 
-    public List<VideoDTO> latestVideos(String channelInput, int limit){
+    public List<VideoDTO> oldestVideos(String channelInput, int limit){
         if(limit == 0){
             return List.of();
         }
@@ -234,7 +248,7 @@ public class VideoService {
 
 
     // to define the best performers of a given channel I have to create a formula that will define the tier based on the videos, length of the video, comment and like count
-    // the most important thing is the total watched time from all viewers(we assume that each viewer watched from start to the end nad the other who didn't make it to the end aren't counted as viewers)
+    // the most important thing is the total watched time from all viewers(we assume that each viewer watched from start to the end and the other who didn't make it to the end aren't counted as viewers)
     //total score = (viewers * videoLength) * (1 + (likes/views) * 10 + (comments/views) * 30) + (if the video has paidProductPlacement we add also 0.30 to the coefficient))
     public List<VideoDTO> bestPerformersFromChannelVideos(String channelInput, int limit){
         if(limit == 0){
@@ -267,15 +281,7 @@ public class VideoService {
     }
 
     private double durationInMinutes(VideoDTO video){
-        String raw = video.getDuration();
-        if(raw == null || raw.isBlank()){
-            return 0.0;
-        }
-        try{
-            return Duration.parse(raw).getSeconds() / 60.0;
-        } catch (DateTimeParseException e){
-            return 0;
-        }
+        return video.getDurationInSeconds() / 60.0;
     }
 
     public List<VideoDTO> worstPerformersFromChannelVideos(String channelInput, int limit){
@@ -312,38 +318,23 @@ public class VideoService {
         return videoRepository.findByChannelIdAndPublishedAtAfter(channelId, date);
     }
 
-    public double likeToViewRatio(String videoInput){
-        String videoId = toVideoId(videoInput);
-        VideoDTO video = getVideoDataWithId(videoId);
-        long likes = video.getLikeCount();
-        long views = video.getViewCount();
-        return likes / (double) views;
+    public ChannelInsightsDTO getChannelInsights(String channelInput){
+        String channelId = channelService.toChannelId(channelInput);
+        ChannelDTO channel = channelService.getChannelData(channelId);
+        List<VideoDTO> videos = getChannelVideos(channelId);
+        return new ChannelInsightsDTO(
+                channel,
+                averageVideoLength(videos),
+                uploadDayDistribution(videos),
+                uploadHourDistribution(videos, channel),
+                viewConcentration(videos)
+        );
     }
 
-    public double commentToViewRatio(String videoInput){
-        String videoId = toVideoId(videoInput);
-        VideoDTO video = getVideoDataWithId(videoId);
-        long comments = video.getCommentCount();
-        long views = video.getViewCount();
-        return comments / (double) views;
-    }
-
-    public Duration videoLength(String videoInput){
-        String videoId = toVideoId(videoInput);
-        VideoDTO video = getVideoDataWithId(videoId);
-        String rawDuration = video.getDuration();
-        if(rawDuration == null ||rawDuration.isBlank()){
-            return Duration.ZERO;
+    private double averageVideoLength(List<VideoDTO> videos){
+        if(videos.isEmpty()){
+            return 0.0;
         }
-        try{
-           return Duration.parse(rawDuration);
-        } catch(DateTimeParseException e){
-            return Duration.ZERO;
-        }
-    }
-
-    public double averageVideoLength(String channelInput){
-        List<VideoDTO> videos = getChannelVideos(channelInput);
         double totalLength = 0.0;
         for(VideoDTO video : videos){
             totalLength += durationInMinutes(video);
@@ -351,8 +342,7 @@ public class VideoService {
         return totalLength / (double) videos.size();
     }
 
-    public Map<DayOfWeek, Long> uploadDayDistribution(String channelInput){
-        List<VideoDTO> videos = getChannelVideos(channelInput);
+    private Map<DayOfWeek, Long> uploadDayDistribution(List<VideoDTO> videos){
         Map<DayOfWeek, Long> counts = new EnumMap<>(DayOfWeek.class);
         for(DayOfWeek day : DayOfWeek.values()){
             counts.put(day, 0L);
@@ -369,11 +359,7 @@ public class VideoService {
         return counts;
     }
 
-    public Map<Integer, Long> uploadHourDistribution(String channelInput){
-        String channelId = channelService.toChannelId(channelInput);
-        ChannelDTO channel = channelService.getChannelDataWithId(channelId);
-        List<VideoDTO> videos = getChannelVideos(channelId);
-
+    private Map<Integer, Long> uploadHourDistribution(List<VideoDTO> videos, ChannelDTO channel){
         Map<Integer, Long> counts = new TreeMap<>();
         for (int hour = 0; hour < 24; hour++) {
             counts.put(hour, 0L);
@@ -393,15 +379,19 @@ public class VideoService {
     }
 
     //returns what part of the total views of the channel comes from the top 10% most watched videos
-    private double viewConcentration(String channelInput){
-        String channelId = channelService.toChannelId(channelInput);
-        List<VideoDTO> videos = getChannelVideos(channelId);
+    private double viewConcentration(List<VideoDTO> videos){
         double totalLength = 0.0;
         for(VideoDTO video : videos){
             totalLength += durationInMinutes(video);
         }
+        if(totalLength == 0.0){
+            return 0.0;
+        }
         int tenPercentVideosCount = (int)(videos.size() * 0.10);
-        List<VideoDTO> bestTenPercent = topByViews(channelInput, tenPercentVideosCount);
+        List<VideoDTO> bestTenPercent = videos.stream()
+                .sorted(Comparator.comparingLong(VideoDTO::getViewCount).reversed())
+                .limit(tenPercentVideosCount)
+                .toList();
         double bestLength = 0.0;
         for(VideoDTO video : bestTenPercent){
             bestLength += durationInMinutes(video);
@@ -436,9 +426,22 @@ public class VideoService {
     }
 
     //some other more precise statistics
-    public long viewIncreaseFromLastSnippet(String videoInput){
+    public VideoInsightsDTO getVideoInsights(String videoInput){
         String videoId = toVideoId(videoInput);
         getOrCreateVideo(videoId);
+        VideoDTO video = getVideoDataWithId(videoId);
+        return new VideoInsightsDTO(
+                video,
+                viewIncreaseFromLastSnapshot(videoId),
+                averageViewsVelocity(videoId),
+                averageCommentVelocity(videoId),
+                averageLikesVelocity(videoId),
+                momentum(videoId),
+                isVideoOutperformingTheChannel(video)
+        );
+    }
+
+    private long viewIncreaseFromLastSnapshot(String videoId){
         List<YTVideoSnapshot> lastTwo = snapshotRepository.findFirst2ByVideoIdOrderByFetchedAtDesc(videoId);
         if(lastTwo.size() < 2){
             return 0;
@@ -446,13 +449,7 @@ public class VideoService {
         return lastTwo.get(0).getViewCount() - lastTwo.get(1).getViewCount();
     }
 
-    public double averageViewsVelocity(String videoInput){
-        String videoId = toVideoId(videoInput);
-        getOrCreateVideo(videoId);
-        return averageViewsVelocityComputation(videoId);
-    }
-
-    private double averageViewsVelocityComputation(String videoId){
+    private double averageViewsVelocity(String videoId){
         List<YTVideoSnapshot> list = getFirstAndLast(videoId);
         if(list.isEmpty()){
             return 0.0;
@@ -486,9 +483,7 @@ public class VideoService {
         return Duration.between(startDate, endDate).toSeconds()/86400.0;
 
     }
-    public double averageCommentVelocity(String videoInput){
-        String videoId = toVideoId(videoInput);
-        getOrCreateVideo(videoId);
+    private double averageCommentVelocity(String videoId){
         List<YTVideoSnapshot> list = getFirstAndLast(videoId);
         if(list.isEmpty()){
             return 0.0;
@@ -503,9 +498,7 @@ public class VideoService {
 
     }
 
-    public double averageLikesVelocity(String videoInput){
-        String videoId = toVideoId(videoInput);
-        getOrCreateVideo(videoId);
+    private double averageLikesVelocity(String videoId){
         List<YTVideoSnapshot> list = getFirstAndLast(videoId);
         if(list.isEmpty()){
             return 0.0;
@@ -520,9 +513,7 @@ public class VideoService {
     }
 
     // return the momentum difference of the views increase from the last 2 snapshots compared to the last 2 before that
-    public double momentum(String videoInput){
-        String videoId = toVideoId(videoInput);
-        getOrCreateVideo(videoId);
+    private double momentum(String videoId){
         List<YTVideoSnapshot> lastTwoSnapshots = snapshotRepository.findFirst4ByVideoIdOrderByFetchedAtDesc(videoId);
         if(lastTwoSnapshots.size() < 4){
             return 0;
@@ -548,27 +539,44 @@ public class VideoService {
     }
 
     //return list of video snapshots ever made for the given video
-    public List<YTVideoSnapshot> growth(String videoInput){
+    public List<YTVideoSnapshotDTO> growth(String videoInput){
         String videoId = toVideoId(videoInput);
-        return snapshotRepository.findByVideoIdOrderByFetchedAtDesc(videoId);
+        return snapshotRepository.findByVideoIdOrderByFetchedAtDesc(videoId).stream()
+                .map(this::toSnapshotDTO)
+                .toList();
+    }
+
+    private YTVideoSnapshotDTO toSnapshotDTO(YTVideoSnapshot snapshot){
+        return new YTVideoSnapshotDTO(
+                snapshot.getVideoId(),
+                snapshot.getViewCount(),
+                snapshot.getLikeCount(),
+                snapshot.getCommentCount(),
+                snapshot.getFetchedAt()
+        );
     }
 
     //return how much time is expected to reach the target views of the video
     public double daysToMilestone(String videoInput, long target){
         String videoId = toVideoId(videoInput);
         VideoDTO video = getVideoDataWithId(videoId);
-        double averageViewsPerDay = averageViewsVelocity(videoId);
         long currentViews = video.getViewCount();
+        if(target <= currentViews){
+            return 0.0;
+        }
+        double averageViewsPerDay = averageViewsVelocity(videoId);
+        if(averageViewsPerDay <= 0.0){
+            throw new InsufficientDataException("Not enough snapshot history to estimate a growth rate for video " + videoId);
+        }
         return (target - currentViews) / averageViewsPerDay;
     }
 
 
-    public boolean isVideoOutperformingTheChannel(String channelInput, String videoInput){
-        List<VideoDTO> channelVideos = getChannelVideos(channelInput);
+    private boolean isVideoOutperformingTheChannel(VideoDTO video){
+        List<VideoDTO> channelVideos = getChannelVideos(video.getChannelId());
         if(channelVideos.isEmpty()){
             return false;
         }
-        VideoDTO video = getVideoDataWithId(toVideoId(videoInput));
         double averageScore = channelVideos.stream()
                 .mapToDouble(this::getVideoScore)
                 .average()

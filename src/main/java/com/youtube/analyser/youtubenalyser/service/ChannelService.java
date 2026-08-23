@@ -25,9 +25,9 @@ public class ChannelService {
 
 
 
-    //fetching data with channelId
-    public ChannelDTO getChannelDataWithId(String channelId){
-        return toChannelDTO(getOrCreateChannel(channelId));
+    //fetching data with channelId or handle
+    public ChannelDTO getChannelData(String channelInput){
+        return toChannelDTO(getOrCreateChannel(toChannelId(channelInput)));
 
     }
 
@@ -60,27 +60,23 @@ public class ChannelService {
     }
 
     private ChannelDTO toChannelDTO(YTChannel channel){
-        return new ChannelDTO(channel.getSavedToTheRepo(), channel.getYtId(), channel.getChannelName(), channel.getDescription(), channel.getChannelUrl(), channel.getCreationDate(), channel.getCountry(), channel.getLanguage(), channel.getThumbnails(), channel.getUploadedVidsPlaylistId(), channel.getTotalViews(), channel.getSubscribers(), channel.getNumVideos(), channel.getPrivacyStatus(), channel.isMadeForKids());
+        long views = channel.getTotalViews();
+        long videos = channel.getNumVideos();
+        long subscribers = channel.getSubscribers();
+        double averageViewsPerVideo = videos == 0 ? 0.0 : views / (double) videos;
+        double viewsPerSubscriber = subscribers == 0 ? 0.0 : views / (double) subscribers;
+        long channelAgeInMonths = channelAgeInMonths(channel);
+        double uploadsPerMonth = channelAgeInMonths == 0 ? 0.0 : videos / (double) channelAgeInMonths;
+        return new ChannelDTO(channel.getSavedToTheRepo(), channel.getYtId(), channel.getChannelName(), channel.getDescription(), channel.getChannelUrl(), channel.getCreationDate(), channel.getCountry(), channel.getLanguage(), channel.getThumbnails(), channel.getUploadedVidsPlaylistId(), channel.getTotalViews(), channel.getSubscribers(), channel.getNumVideos(), channel.getPrivacyStatus(), channel.isMadeForKids(),
+                averageViewsPerVideo, viewsPerSubscriber, channelAgeInMonths, uploadsPerMonth);
     }
 
-
-    //fetching data with channel handle
-    public ChannelDTO getChannelDataWithHandle(String handle){
-        return toChannelDTO(getOrCreateChannelWithHandle(handle));
+    private long channelAgeInMonths(YTChannel channel){
+        LocalDate createdAt = channel.getCreationDate().atZone(ZoneOffset.UTC).toLocalDate();
+        Period period = Period.between(createdAt, LocalDate.now(ZoneOffset.UTC));
+        return period.getYears() * 12L + period.getMonths();
     }
 
-    private YTChannel getOrCreateChannelWithHandle(String handle){
-        return channelRepository.findByChannelUrl(handle)
-                .filter(this::isNew)
-                .orElseGet(() -> fetchAndSaveChannelByHandle(handle));
-    }
-
-    private YTChannel fetchAndSaveChannelByHandle(String handle){
-        ChannelResponse response = youTubeClient.getChannelDataWithHandle(parts, handle);
-        YTChannel channel = toYTChannel(response);
-        snapshotRepository.save(new YTChannelSnapshot(channel.getYtId(), channel.getTotalViews(), channel.getSubscribers(), channel.getNumVideos()));
-        return channelRepository.save(channel);
-    }
 
     //handling more than one channel request
     public List<ChannelDTO> getManyChannels(List<String> channelInputs){
@@ -110,7 +106,7 @@ public class ChannelService {
         return channelRepository.findByChannelUrl(cleaned)
                 .map(YTChannel::getYtId)
                 .orElseGet(() -> {
-                    YTChannel fetched = fetchAndSaveChannelByHandle(cleaned);
+                    YTChannel fetched = fetchAndSaveChannel(cleaned);
                     return fetched == null ? null : fetched.getYtId();
                 });
     }
@@ -134,7 +130,8 @@ public class ChannelService {
 
 
     //see the historical snapshots of a given channel
-    public List<YTChannelSnapshotDTO> getHistory(String channelId){
+    public List<YTChannelSnapshotDTO> getHistory(String channelInput){
+        String channelId = toChannelId(channelInput);
         getOrCreateChannel(channelId);
         List<YTChannelSnapshot> result = snapshotRepository.findByChannelIdOrderByFetchedAtDesc(channelId);
         List<YTChannelSnapshotDTO> dto = new ArrayList<>();
@@ -144,10 +141,6 @@ public class ChannelService {
         return dto;
     }
 
-    public List<YTChannelSnapshotDTO> getHistoryByHandle(String handle){
-        String channelId = toChannelId(handle);
-        return getHistory(channelId);
-    }
 
     private YTChannelSnapshotDTO toSnapshotDTO(YTChannelSnapshot snapshot){
         return new YTChannelSnapshotDTO(
@@ -156,60 +149,10 @@ public class ChannelService {
         );
     }
 
-    //statistical metrics either provided a handle or a channel id
-    public double averageViewsPerVideo(String data){
-        String channelId = toChannelId(data);
-        if(channelId == null){
-            throw new NoSuchChannelException("Could not find channel " + data);
-        }
-        YTChannel channel = getOrCreateChannel(channelId);
-        long views = channel.getTotalViews();
-        long videos = channel.getNumVideos();
-        if(videos == 0){
-            return 0.0;
-        }
-        return views/(videos * 1.0);
-    }
-
-    public double viewsPerSubscriber(String data){
-        String channelId = toChannelId(data);
-        if(channelId == null){
-            throw new NoSuchChannelException("Could not find channel " + data);
-        }
-        YTChannel channel = getOrCreateChannel(channelId);
-        long views = channel.getTotalViews();
-        long subscribers = channel.getSubscribers();
-        if(subscribers == 0){
-            return 0.0;
-        }
-        return views/(subscribers * 1.0);
-    }
-
-    public long channelAgeInMonths(String data){
-        String channelId = toChannelId(data);
-        if(channelId == null){
-            throw new NoSuchChannelException("Could not find channel " + data);
-        }
-        YTChannel channel = getOrCreateChannel(channelId);
-        LocalDate createdAt = channel.getCreationDate().atZone(ZoneOffset.UTC).toLocalDate();
-        Period period = Period.between(createdAt, LocalDate.now(ZoneOffset.UTC));
-        return period.getYears() * 12L + period.getMonths();
-    }
-
-    public double uploadsPerMonth(String data){
-        String channelId = toChannelId(data);
-        if(channelId == null){
-            throw new NoSuchChannelException("Could not find channel " + data);
-        }
-        YTChannel channel = getOrCreateChannel(channelId);
-        long uploads = channel.getNumVideos();
-        long months = channelAgeInMonths(data);
-        return uploads / (months * 1.0);
-    }
 
     public String getUploadsPlaylistId(String channelInput){
         String id = toChannelId(channelInput);
-        ChannelDTO channel = getChannelDataWithId(id);
+        ChannelDTO channel = getChannelData(id);
         return channel.getUploadedVidsPlaylistId();
     }
 

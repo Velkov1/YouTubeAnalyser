@@ -34,4 +34,7 @@ public class VideoDTO {
     private long likeCount;
     private long commentCount;
     private boolean hasPaidProductPlacement;
+    private double likeToViewRatio;
+    private double commentToViewRatio;
+    private long durationInSeconds;
 }

@@ -27,4 +27,8 @@ public class ChannelDTO {
     private long numVideos;
     private String privacyStatus;
     private boolean madeForKids;
+    private double averageViewsPerVideo;
+    private double viewsPerSubscriber;
+    private long channelAgeInMonths;
+    private double uploadsPerMonth;
 }
