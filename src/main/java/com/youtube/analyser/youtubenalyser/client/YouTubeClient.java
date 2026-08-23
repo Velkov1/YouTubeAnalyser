@@ -12,6 +12,7 @@ import com.youtube.analyser.youtubenalyser.model.video.VideoListResponse;
 import com.youtube.analyser.youtubenalyser.model.video.VideoResponse;
 import com.youtube.analyser.youtubenalyser.model.videoCategory.VideoCategoryListResponse;
 import com.youtube.analyser.youtubenalyser.model.videoCategory.VideoCategoryResponse;
+import com.youtube.analyser.youtubenalyser.search.SearchListResponse;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -116,7 +117,7 @@ public class YouTubeClient {
     }
 
     public PlaylistItemListResponse getPlaylistItemResponse(String playlistId, String nextPageToken){
-        return restClient.get()
+        PlaylistItemListResponse response = restClient.get()
                 .uri(uriBuilder -> uriBuilder
                         .path("/playlistItems")
                         .queryParam("part", "snippet")
@@ -127,10 +128,15 @@ public class YouTubeClient {
                         .build())
                 .retrieve()
                 .body(PlaylistItemListResponse.class);
+        if(response == null || response.getItems() == null){
+            response = new PlaylistItemListResponse();
+            response.setItems(List.of());
+        }
+        return response;
     }
 
     public I18nRegionListResponse getI18nRegions(){
-        return restClient.get()
+        I18nRegionListResponse response = restClient.get()
                 .uri(uriBuilder -> uriBuilder
                         .path("/i18nRegions")
                         .queryParam("part", "snippet")
@@ -138,6 +144,11 @@ public class YouTubeClient {
                         .build())
                 .retrieve()
                 .body(I18nRegionListResponse.class);
+        if(response == null || response.getItems() == null){
+            response = new I18nRegionListResponse();
+            response.setItems(List.of());
+        }
+        return response;
     }
 
     public List<VideoResponse> getTrending(String parts, String regionCode){
@@ -176,7 +187,7 @@ public class YouTubeClient {
     }
 
     public VideoCategoryListResponse getVideoCategories(String regionCode){
-        return restClient.get()
+        VideoCategoryListResponse response = restClient.get()
                 .uri(uriBuilder -> uriBuilder
                         .path("/videoCategories")
                         .queryParam("part", "snippet")
@@ -185,10 +196,15 @@ public class YouTubeClient {
                         .build())
                 .retrieve()
                 .body(VideoCategoryListResponse.class);
+        if(response == null || response.getItems() == null){
+            response = new VideoCategoryListResponse();
+            response.setItems(List.of());
+        }
+        return response;
     }
 
     public CommentThreadListResponse getCommentThreadsByVideo(String parts, String videoId, String nextPageToken){
-        return restClient.get()
+        CommentThreadListResponse response = restClient.get()
                 .uri(uriBuilder -> uriBuilder
                         .path("/commentThreads")
                         .queryParam("part", parts)
@@ -199,5 +215,31 @@ public class YouTubeClient {
                         .build())
                 .retrieve()
                 .body(CommentThreadListResponse.class);
+        if(response == null || response.getItems() == null){
+            response = new CommentThreadListResponse();
+            response.setItems(List.of());
+        }
+        return response;
+    }
+
+    public SearchListResponse search(String searchQuery, String type, String nextPageToken){
+        SearchListResponse response = restClient.get()
+                .uri(uriBuilder -> uriBuilder
+                        .path("search")
+                        .queryParam("part", "snippet")
+                        .queryParam("maxResults", 25)
+                        .queryParam("q", searchQuery)
+                        .queryParam("type", type)
+                        .queryParamIfPresent("pageToken", Optional.ofNullable(nextPageToken))
+                        .queryParam("key", key)
+                        .build())
+                .retrieve()
+                .body(SearchListResponse.class);
+
+        if(response == null || response.getItems() == null){
+            response = new SearchListResponse();
+            response.setItems(List.of());
+        }
+        return response;
     }
 }

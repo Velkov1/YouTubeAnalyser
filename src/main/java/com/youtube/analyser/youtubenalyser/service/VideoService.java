@@ -16,6 +16,7 @@ import com.youtube.analyser.youtubenalyser.model.videoCategory.VideoCategoryResp
 import com.youtube.analyser.youtubenalyser.repository.ChannelUploadsCacheRepository;
 import com.youtube.analyser.youtubenalyser.repository.VideoRepository;
 import com.youtube.analyser.youtubenalyser.repository.YTVideoSnapshotRepository;
+import com.youtube.analyser.youtubenalyser.search.SearchListResponse;
 import lombok.AllArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
@@ -590,6 +591,18 @@ public class VideoService {
                 .toList();
     }
 
+
+    public void refreshSnapshot(String videoId){
+        fetchAndSaveVideo(videoId);
+    }
+
+    public List<VideoDTO> searchVideos(String searchQuery){
+        SearchListResponse response = youTubeClient.search(searchQuery, "video", null);
+        List<String> ids = response.getItems().stream()
+                .map(item -> item.getId().getVideoId())
+                .toList();
+        return getManyVideos(ids);
+    }
 
 
 

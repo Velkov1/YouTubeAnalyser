@@ -6,6 +6,7 @@ import com.youtube.analyser.youtubenalyser.model.channel.*;
 import com.youtube.analyser.youtubenalyser.model.video.VideoDTO;
 import com.youtube.analyser.youtubenalyser.repository.ChannelRepository;
 import com.youtube.analyser.youtubenalyser.repository.YTChannelSnapshotRepository;
+import com.youtube.analyser.youtubenalyser.search.SearchListResponse;
 import lombok.AllArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -210,6 +211,18 @@ public class ChannelService {
         String id = toChannelId(channelInput);
         ChannelDTO channel = getChannelDataWithId(id);
         return channel.getUploadedVidsPlaylistId();
+    }
+
+    public void refreshSnapshot(String channelId){
+        fetchAndSaveChannel(channelId);
+    }
+
+    public List<ChannelDTO> searchChannels(String searchQuery){
+        SearchListResponse response = youTubeClient.search(searchQuery, "channel", null);
+        List<String> ids = response.getItems().stream()
+                .map(item -> item.getId().getChannelId())
+                .toList();
+        return getManyChannels(ids);
     }
 
 }
