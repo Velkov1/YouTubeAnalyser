@@ -24,6 +24,8 @@ public class YTChannel {
     private Instant creationDate;
     private String country;
     private String language;
+    @ElementCollection(fetch = FetchType.EAGER)
+    @CollectionTable(name = "channel_thumbnails", joinColumns = @JoinColumn(name = "channel_id"))
     private List<Thumbnail> thumbnails;
     private String uploadedVidsPlaylistId;
     private long totalViews;

@@ -22,6 +22,8 @@ public class YTVideo {
     private String channelId;
     private String videoTitle;
     private String videoDescription;
+    @ElementCollection(fetch = FetchType.EAGER)
+    @CollectionTable(name = "video_thumbnails", joinColumns = @JoinColumn(name = "video_id"))
     private List<Thumbnail> thumbnails;
     private String channelTitle;
     private List<String> tags;

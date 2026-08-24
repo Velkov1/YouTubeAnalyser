@@ -123,7 +123,7 @@ public class VideoService {
             cleaned = cleaned.substring(cleaned.indexOf("watch?v=") + 8);
         }
         else{
-            cleaned = cleaned.substring(cleaned.lastIndexOf("/" + 1));
+            cleaned = cleaned.substring(cleaned.lastIndexOf("/") + 1);
         }
         return validate(cleaned.split("[?&#]")[0], data);
     }
