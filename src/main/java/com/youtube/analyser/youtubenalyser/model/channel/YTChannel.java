@@ -19,6 +19,7 @@ public class YTChannel {
     @Setter
     private Instant savedToTheRepo;
     private String channelName;
+    @Lob
     private String description;
     private String channelUrl;
     private Instant creationDate;

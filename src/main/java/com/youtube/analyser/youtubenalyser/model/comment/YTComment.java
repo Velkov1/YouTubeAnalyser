@@ -2,6 +2,7 @@ package com.youtube.analyser.youtubenalyser.model.comment;
 
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
+import jakarta.persistence.Lob;
 import jakarta.persistence.Table;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -17,6 +18,7 @@ public class YTComment {
     private String commentId;
     private String videoId;
     private String authorName;
+    @Lob
     private String text;
     private long likeCount;
     private Instant publishedAt;

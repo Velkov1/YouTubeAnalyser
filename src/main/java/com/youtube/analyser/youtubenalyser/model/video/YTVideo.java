@@ -21,6 +21,7 @@ public class YTVideo {
     private Instant publishedAt;
     private String channelId;
     private String videoTitle;
+    @Lob
     private String videoDescription;
     @ElementCollection(fetch = FetchType.EAGER)
     @CollectionTable(name = "video_thumbnails", joinColumns = @JoinColumn(name = "video_id"))

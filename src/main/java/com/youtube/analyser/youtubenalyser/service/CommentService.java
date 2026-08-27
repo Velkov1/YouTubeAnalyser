@@ -13,6 +13,8 @@ import java.util.List;
 @AllArgsConstructor
 @Service
 public class CommentService {
+    private static final int MAX_COMMENTS_PER_VIDEO = 500;
+
     private final YouTubeClient youTubeClient;
     private final CommentRepository commentRepository;
     private final VideoService videoService;
@@ -30,7 +32,7 @@ public class CommentService {
                 result.add(toYTCommentDTO(saved));
             }
             nextPageToken = response.getNextPageToken();
-        }while(nextPageToken != null);
+        }while(nextPageToken != null && result.size() < MAX_COMMENTS_PER_VIDEO);
         return result;
     }
 

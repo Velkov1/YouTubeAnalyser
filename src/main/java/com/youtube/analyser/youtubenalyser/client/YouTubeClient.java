@@ -13,16 +13,22 @@ import com.youtube.analyser.youtubenalyser.model.video.VideoResponse;
 import com.youtube.analyser.youtubenalyser.model.videoCategory.VideoCategoryListResponse;
 import com.youtube.analyser.youtubenalyser.model.videoCategory.VideoCategoryResponse;
 import com.youtube.analyser.youtubenalyser.search.SearchListResponse;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
+import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestClient;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.function.Supplier;
 
+@Slf4j
 @Component
 public class YouTubeClient {
+    private static final int MAX_ATTEMPTS = 3;
+
     private final RestClient restClient;
 
     @Value("${youTube.api-key}")
@@ -32,9 +38,31 @@ public class YouTubeClient {
      this.restClient = restClient;
     }
 
+    private <T> T withRetry(Supplier<T> call){
+        for(int attempt = 1; attempt <= MAX_ATTEMPTS; attempt++){
+            try{
+                return call.get();
+            } catch (HttpClientErrorException e){
+                throw e;
+            } catch (RuntimeException e){
+                if(attempt == MAX_ATTEMPTS){
+                    throw e;
+                }
+                log.warn("Transient failure calling YouTube API (attempt {}/{}): {}", attempt, MAX_ATTEMPTS, e.getMessage());
+                try{
+                    Thread.sleep(300L * attempt);
+                } catch (InterruptedException interrupted){
+                    Thread.currentThread().interrupt();
+                    throw e;
+                }
+            }
+        }
+        throw new IllegalStateException("Unreachable");
+    }
+
     //Channels mapping
     public ChannelResponse getChannelDataWithChannelId(String parts, String channelId){
-        ChannelListResponse response =  restClient.get()
+        ChannelListResponse response = withRetry(() -> restClient.get()
                     .uri(uriBuilder -> uriBuilder
                             .path("/channels")
                             .queryParam("part", parts)
@@ -42,7 +70,7 @@ public class YouTubeClient {
                             .queryParam("key", key)
                             .build())
                     .retrieve()
-                    .body(ChannelListResponse.class);
+                    .body(ChannelListResponse.class));
         if(response == null || response.getItems()==null ||response.getItems().isEmpty()){
             throw new NoSuchChannelException("No channel found with id " + channelId);
         }
@@ -50,7 +78,7 @@ public class YouTubeClient {
     }
 
     public ChannelResponse getChannelDataWithHandle(String parts, String handle){
-        ChannelListResponse response = restClient.get()
+        ChannelListResponse response = withRetry(() -> restClient.get()
                 .uri(uriBuilder -> uriBuilder
                         .path("/channels")
                         .queryParam("part", parts)
@@ -58,7 +86,7 @@ public class YouTubeClient {
                         .queryParam("key", key)
                         .build())
                 .retrieve()
-                .body(ChannelListResponse.class);
+                .body(ChannelListResponse.class));
         if(response == null || response.getItems()==null ||response.getItems().isEmpty()){
             throw new NoSuchChannelException("No channel found with handle " + handle);
         }
@@ -66,7 +94,7 @@ public class YouTubeClient {
     }
 
     public List<ChannelResponse> getMultipleChannelData(String parts, String ids){
-        ChannelListResponse response = restClient.get()
+        ChannelListResponse response = withRetry(() -> restClient.get()
                 .uri(uriBuilder -> uriBuilder
                         .path("/channels")
                         .queryParam("part", parts)
@@ -74,7 +102,7 @@ public class YouTubeClient {
                         .queryParam("key", key)
                         .build())
                 .retrieve()
-                .body(ChannelListResponse.class);
+                .body(ChannelListResponse.class));
 
         if(response == null || response.getItems() == null){
             return List.of();
@@ -86,7 +114,7 @@ public class YouTubeClient {
     //VIDEO
 
     public VideoResponse getVideoDataWithVideoId(String parts, String videoId){
-        VideoListResponse response = restClient.get()
+        VideoListResponse response = withRetry(() -> restClient.get()
                 .uri(uriBuilder -> uriBuilder
                         .path("/videos")
                         .queryParam("part", parts)
@@ -94,14 +122,14 @@ public class YouTubeClient {
                         .queryParam("key", key)
                         .build())
                 .retrieve()
-                .body(VideoListResponse.class);
+                .body(VideoListResponse.class));
         if(response == null || response.getItems()== null ||response.getItems().isEmpty()){
             throw new NoSuchVideoException("No video found with id " + videoId);
         }
         return response.getItems().get(0);
     }
     public List<VideoResponse> getMultipleVideoData(String parts, String ids){
-        VideoListResponse response = restClient.get()
+        VideoListResponse response = withRetry(() -> restClient.get()
                 .uri(uriBuilder -> uriBuilder
                         .path("/videos")
                         .queryParam("part", parts)
@@ -109,7 +137,7 @@ public class YouTubeClient {
                         .queryParam("key", key)
                         .build())
                 .retrieve()
-                .body(VideoListResponse.class);
+                .body(VideoListResponse.class));
         if(response == null || response.getItems() == null){
             return  List.of();
         }
@@ -117,7 +145,7 @@ public class YouTubeClient {
     }
 
     public PlaylistItemListResponse getPlaylistItemResponse(String playlistId, String nextPageToken){
-        PlaylistItemListResponse response = restClient.get()
+        PlaylistItemListResponse response = withRetry(() -> restClient.get()
                 .uri(uriBuilder -> uriBuilder
                         .path("/playlistItems")
                         .queryParam("part", "snippet")
@@ -127,7 +155,7 @@ public class YouTubeClient {
                         .queryParam("key", key)
                         .build())
                 .retrieve()
-                .body(PlaylistItemListResponse.class);
+                .body(PlaylistItemListResponse.class));
         if(response == null || response.getItems() == null){
             response = new PlaylistItemListResponse();
             response.setItems(List.of());
@@ -136,14 +164,14 @@ public class YouTubeClient {
     }
 
     public I18nRegionListResponse getI18nRegions(){
-        I18nRegionListResponse response = restClient.get()
+        I18nRegionListResponse response = withRetry(() -> restClient.get()
                 .uri(uriBuilder -> uriBuilder
                         .path("/i18nRegions")
                         .queryParam("part", "snippet")
                         .queryParam("key", key)
                         .build())
                 .retrieve()
-                .body(I18nRegionListResponse.class);
+                .body(I18nRegionListResponse.class));
         if(response == null || response.getItems() == null){
             response = new I18nRegionListResponse();
             response.setItems(List.of());
@@ -152,7 +180,7 @@ public class YouTubeClient {
     }
 
     public List<VideoResponse> getTrending(String parts, String regionCode){
-        VideoListResponse response = restClient.get()
+        VideoListResponse response = withRetry(() -> restClient.get()
                 .uri(uriBuilder -> uriBuilder
                         .path("/videos")
                         .queryParam("part", parts)
@@ -161,7 +189,7 @@ public class YouTubeClient {
                         .queryParam("key", key)
                         .build())
                 .retrieve()
-                .body(VideoListResponse.class);
+                .body(VideoListResponse.class));
         if(response == null || response.getItems() == null){
             return  List.of();
         }
@@ -169,7 +197,7 @@ public class YouTubeClient {
     }
 
     public List<VideoResponse> getTrendingByCategory(String parts, String regionCode, String categoryId){
-        VideoListResponse response = restClient.get()
+        VideoListResponse response = withRetry(() -> restClient.get()
                 .uri(uriBuilder -> uriBuilder
                         .path("/videos")
                         .queryParam("part", parts)
@@ -179,7 +207,7 @@ public class YouTubeClient {
                         .queryParam("key", key)
                         .build())
                 .retrieve()
-                .body(VideoListResponse.class);
+                .body(VideoListResponse.class));
         if(response == null || response.getItems() == null){
             return  List.of();
         }
@@ -187,7 +215,7 @@ public class YouTubeClient {
     }
 
     public VideoCategoryListResponse getVideoCategories(String regionCode){
-        VideoCategoryListResponse response = restClient.get()
+        VideoCategoryListResponse response = withRetry(() -> restClient.get()
                 .uri(uriBuilder -> uriBuilder
                         .path("/videoCategories")
                         .queryParam("part", "snippet")
@@ -195,7 +223,7 @@ public class YouTubeClient {
                         .queryParam("key", key)
                         .build())
                 .retrieve()
-                .body(VideoCategoryListResponse.class);
+                .body(VideoCategoryListResponse.class));
         if(response == null || response.getItems() == null){
             response = new VideoCategoryListResponse();
             response.setItems(List.of());
@@ -204,7 +232,7 @@ public class YouTubeClient {
     }
 
     public CommentThreadListResponse getCommentThreadsByVideo(String parts, String videoId, String nextPageToken){
-        CommentThreadListResponse response = restClient.get()
+        CommentThreadListResponse response = withRetry(() -> restClient.get()
                 .uri(uriBuilder -> uriBuilder
                         .path("/commentThreads")
                         .queryParam("part", parts)
@@ -214,7 +242,7 @@ public class YouTubeClient {
                         .queryParam("key", key)
                         .build())
                 .retrieve()
-                .body(CommentThreadListResponse.class);
+                .body(CommentThreadListResponse.class));
         if(response == null || response.getItems() == null){
             response = new CommentThreadListResponse();
             response.setItems(List.of());
@@ -223,9 +251,9 @@ public class YouTubeClient {
     }
 
     public SearchListResponse search(String searchQuery, String type, String nextPageToken){
-        SearchListResponse response = restClient.get()
+        SearchListResponse response = withRetry(() -> restClient.get()
                 .uri(uriBuilder -> uriBuilder
-                        .path("search")
+                        .path("/search")
                         .queryParam("part", "snippet")
                         .queryParam("maxResults", 25)
                         .queryParam("q", searchQuery)
@@ -234,7 +262,7 @@ public class YouTubeClient {
                         .queryParam("key", key)
                         .build())
                 .retrieve()
-                .body(SearchListResponse.class);
+                .body(SearchListResponse.class));
 
         if(response == null || response.getItems() == null){
             response = new SearchListResponse();

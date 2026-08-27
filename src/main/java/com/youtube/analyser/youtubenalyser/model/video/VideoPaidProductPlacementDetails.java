@@ -5,6 +5,6 @@ import lombok.Data;
 
 @Data
 @JsonIgnoreProperties(ignoreUnknown = true)
-public class VideoHasPaidProductPlacementDetails {
+public class VideoPaidProductPlacementDetails {
     private boolean hasPaidProductPlacement;
 }

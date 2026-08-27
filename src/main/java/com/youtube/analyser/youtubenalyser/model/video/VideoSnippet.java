@@ -1,6 +1,7 @@
 package com.youtube.analyser.youtubenalyser.model.video;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.youtube.analyser.youtubenalyser.model.channel.Thumbnail;
 import lombok.Data;
 
@@ -13,7 +14,9 @@ import java.util.Map;
 public class VideoSnippet {
     private Instant publishedAt;
     private String channelId;
+    @JsonProperty("title")
     private String videoTitle;
+    @JsonProperty("description")
     private String videoDescription;
     private Map<String, Thumbnail> thumbnails;
     private String channelTitle;

@@ -8,6 +8,7 @@ import com.youtube.analyser.youtubenalyser.repository.ChannelRepository;
 import com.youtube.analyser.youtubenalyser.repository.YTChannelSnapshotRepository;
 import com.youtube.analyser.youtubenalyser.search.SearchListResponse;
 import lombok.AllArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 
 import java.time.*;
@@ -34,7 +35,13 @@ public class ChannelService {
     private YTChannel getOrCreateChannel(String channelId){
         return channelRepository.findById(channelId)
                 .filter(this::isNew)
-                .orElseGet(() -> fetchAndSaveChannel(channelId));
+                .orElseGet(() -> {
+                    try{
+                        return fetchAndSaveChannel(channelId);
+                    } catch (DataIntegrityViolationException e){
+                        return channelRepository.findById(channelId).orElseThrow(() -> e);
+                    }
+                });
     }
 
     //if the last enter of data of the channel is older than 24 hours, then the repo has to be updated
@@ -46,6 +53,13 @@ public class ChannelService {
 
     private YTChannel fetchAndSaveChannel(String channelId) throws NoSuchChannelException {
         ChannelResponse response = youTubeClient.getChannelDataWithChannelId(parts, channelId);
+        YTChannel channel = toYTChannel(response);
+        snapshotRepository.save(new YTChannelSnapshot(channel.getYtId(), channel.getTotalViews(), channel.getSubscribers(), channel.getNumVideos()));
+        return channelRepository.save(channel);
+    }
+
+    private YTChannel fetchAndSaveChannelByHandle(String handle) throws NoSuchChannelException {
+        ChannelResponse response = youTubeClient.getChannelDataWithHandle(parts, handle);
         YTChannel channel = toYTChannel(response);
         snapshotRepository.save(new YTChannelSnapshot(channel.getYtId(), channel.getTotalViews(), channel.getSubscribers(), channel.getNumVideos()));
         return channelRepository.save(channel);
@@ -106,7 +120,7 @@ public class ChannelService {
         return channelRepository.findByChannelUrl(cleaned)
                 .map(YTChannel::getYtId)
                 .orElseGet(() -> {
-                    YTChannel fetched = fetchAndSaveChannel(cleaned);
+                    YTChannel fetched = fetchAndSaveChannelByHandle(cleaned);
                     return fetched == null ? null : fetched.getYtId();
                 });
     }

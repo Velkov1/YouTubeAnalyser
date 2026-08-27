@@ -5,6 +5,7 @@ import com.youtube.analyser.youtubenalyser.exception.*;
 import com.youtube.analyser.youtubenalyser.model.channel.ChannelDTO;
 import com.youtube.analyser.youtubenalyser.model.channel.ChannelInsightsDTO;
 import com.youtube.analyser.youtubenalyser.model.channel.ChannelUploadsCache;
+import com.youtube.analyser.youtubenalyser.model.channel.RegionRestriction;
 import com.youtube.analyser.youtubenalyser.model.playlist.PlaylistItem;
 import com.youtube.analyser.youtubenalyser.model.playlist.PlaylistItemListResponse;
 import com.youtube.analyser.youtubenalyser.model.region.RegionCodeCache;
@@ -16,6 +17,7 @@ import com.youtube.analyser.youtubenalyser.repository.VideoRepository;
 import com.youtube.analyser.youtubenalyser.repository.YTVideoSnapshotRepository;
 import com.youtube.analyser.youtubenalyser.search.SearchListResponse;
 import lombok.AllArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 
@@ -33,7 +35,7 @@ public class VideoService {
     private final RegionCodeCache regionCodeCache;
     private final VideoCategoryCache videoCategoryCache;
     private final ChannelUploadsCacheRepository channelUploadsCacheRepository;
-    private final String parts = "snippet, contentDetails, status, statistics, hasPaidProductPlacementDetails";
+    private final String parts = "snippet, contentDetails, status, statistics, paidProductPlacementDetails";
 
     //fetching data with video id
     //provided the user enters either a video link or a video id
@@ -43,7 +45,13 @@ public class VideoService {
     private YTVideo getOrCreateVideo(String videoId){
         return videoRepository.findByVideoId(videoId)
                 .filter(this::isNew)
-                .orElseGet(() -> fetchAndSaveVideo(videoId));
+                .orElseGet(() -> {
+                    try{
+                        return fetchAndSaveVideo(videoId);
+                    } catch (DataIntegrityViolationException e){
+                        return videoRepository.findByVideoId(videoId).orElseThrow(() -> e);
+                    }
+                });
     }
 
     private boolean isNew(YTVideo video){
@@ -57,13 +65,16 @@ public class VideoService {
         return videoRepository.save(video);
     }
     private YTVideo toYTVideo(VideoResponse response){
+        RegionRestriction regionRestriction = response.getContentDetails().getRegionRestriction();
+        List<String> allowed = regionRestriction == null ? List.of() : regionRestriction.getAllowed();
+        List<String> blocked = regionRestriction == null ? List.of() : regionRestriction.getBlocked();
         return new YTVideo(
                 response.getId(),
                 response.getSnippet().getPublishedAt(), response.getSnippet().getChannelId(), response.getSnippet().getVideoTitle(), response.getSnippet().getVideoDescription(), response.getSnippet().getThumbnails().values().stream().toList(),response.getSnippet().getChannelTitle(), response.getSnippet().getTags(), response.getSnippet().getCategoryId(), response.getSnippet().getLiveBroadcastContent(), response.getSnippet().getDefaultLanguage(),
-                response.getContentDetails().getDuration(), response.getContentDetails().getDefinition(), response.getContentDetails().getCaption(), response.getContentDetails().getRegionRestriction().getAllowed(), response.getContentDetails().getRegionRestriction().getBlocked(),
+                response.getContentDetails().getDuration(), response.getContentDetails().getDefinition(), response.getContentDetails().getCaption(), allowed, blocked,
                 response.getStatus().getPrivacyStatus(),response.getStatus().isMadeForKids(),
                 response.getStatistics().getViewCount(), response.getStatistics().getLikeCount(), response.getStatistics().getCommentCount(),
-                response.getHasPaidProductPlacementDetails().isHasPaidProductPlacement()
+                response.getPaidProductPlacementDetails().isHasPaidProductPlacement()
         );
     }
     private VideoDTO toYTVideoDTO(YTVideo video){
@@ -135,6 +146,8 @@ public class VideoService {
         return id;
     }
 
+    private static final int MAX_IDS_PER_REQUEST = 50;
+
     private List<YTVideo> fetchByIds(List<String> ids){
         List<YTVideo> result = new ArrayList<>();
         List<String> missing = new ArrayList<>();
@@ -142,10 +155,12 @@ public class VideoService {
             videoRepository.findByVideoId(id).filter(this::isNew)
                     .ifPresentOrElse(result::add, () -> missing.add(id));
         }
-        if(!missing.isEmpty()){
-            for(VideoResponse resp : youTubeClient.getMultipleVideoData(parts, String.join(",", missing))){
-                result.add(videoRepository.save(toYTVideo(resp)));
+        for(int start = 0; start < missing.size(); start += MAX_IDS_PER_REQUEST){
+            int end = Math.min(start + MAX_IDS_PER_REQUEST, missing.size());
+            List<String> batch = missing.subList(start, end);
+            for(VideoResponse resp : youTubeClient.getMultipleVideoData(parts, String.join(",", batch))){
                 YTVideo video = toYTVideo(resp);
+                result.add(videoRepository.save(video));
                 snapshotRepository.save(new YTVideoSnapshot(video.getVideoId(), video.getViewCount(), video.getLikeCount(), video.getCommentCount()));
             }
         }
@@ -573,15 +588,8 @@ public class VideoService {
 
 
     private boolean isVideoOutperformingTheChannel(VideoDTO video){
-        List<VideoDTO> channelVideos = getChannelVideos(video.getChannelId());
-        if(channelVideos.isEmpty()){
-            return false;
-        }
-        double averageScore = channelVideos.stream()
-                .mapToDouble(this::getVideoScore)
-                .average()
-                .orElse(0.0);
-        return getVideoScore(video) > averageScore;
+        ChannelDTO channel = channelService.getChannelData(video.getChannelId());
+        return video.getViewCount() > channel.getAverageViewsPerVideo();
     }
 
     // returns the videos with the highest momentum difference

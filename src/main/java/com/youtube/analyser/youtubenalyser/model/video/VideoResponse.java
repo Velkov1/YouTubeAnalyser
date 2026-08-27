@@ -13,6 +13,6 @@ public class VideoResponse {
     private VideoContentDetails contentDetails;
     private Status status;
     private VideoStatistics statistics;
-    private VideoHasPaidProductPlacementDetails hasPaidProductPlacementDetails;
+    private VideoPaidProductPlacementDetails paidProductPlacementDetails;
 
 }
