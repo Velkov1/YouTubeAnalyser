@@ -37,3 +37,6 @@ application-local.properties
 
 ### Local database ###
 /data/
+.DS_Store
+.claude/
+HELP.md

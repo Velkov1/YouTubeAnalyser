@@ -16,8 +16,8 @@ async function fetchTrending(regionCode, categoryId) {
     result.innerHTML = '<p class="meta">Loading...</p>';
 
     const url = categoryId
-        ? `/api/videos/trending/region=${encodeURIComponent(regionCode)}/category=${encodeURIComponent(categoryId)}`
-        : `/api/videos/trending/region=${encodeURIComponent(regionCode)}`;
+        ? `/api/videos/trending?region=${encodeURIComponent(regionCode)}&category=${encodeURIComponent(categoryId)}`
+        : `/api/videos/trending?region=${encodeURIComponent(regionCode)}`;
 
     const response = await fetch(url);
 

@@ -160,7 +160,7 @@ async function calculateMilestone(videoId) {
 
     milestoneResult.textContent = "Calculating...";
 
-    const response = await fetch(`/api/videos/${videoId}/days_to_milestone/target=${target}`);
+    const response = await fetch(`/api/videos/${videoId}/days_to_milestone?target=${encodeURIComponent(target)}`);
 
     if (!response.ok) {
         milestoneResult.textContent = await response.text();

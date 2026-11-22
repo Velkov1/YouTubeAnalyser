@@ -35,9 +35,9 @@ async function fetchChannel(channelInput) {
 
     const [insightsResponse, videosResponse, historyResponse, risingResponse] = await Promise.all([
         fetch(`/api/videos/${encodeURIComponent(channelId)}/insights`),
-        fetch(`/api/videos/${encodeURIComponent(channelId)}/most_watched/limit=12`),
+        fetch(`/api/videos/${encodeURIComponent(channelId)}/most_watched?limit=12`),
         fetch(`/api/channels/${encodeURIComponent(channelId)}/history`),
-        fetch(`/api/videos/${encodeURIComponent(channelId)}/rising_videos/limit=12`)
+        fetch(`/api/videos/${encodeURIComponent(channelId)}/rising_videos?limit=12`)
     ]);
 
     if (!insightsResponse.ok) {

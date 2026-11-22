@@ -39,59 +39,59 @@ public class VideoController {
         return videoService.getChannelVideos(channelInput);
     }
 
-    @GetMapping("/{channelInput}/most_watched/limit={limit}")
+    @GetMapping("/{channelInput}/most_watched")
     public List<VideoDTO> topByViews(@PathVariable String channelInput,
-                                     @PathVariable int limit){
+                                     @RequestParam int limit){
         return videoService.topByViews(channelInput, limit);
     }
 
-    @GetMapping("/{channelInput}/least_watched/limit={limit}")
+    @GetMapping("/{channelInput}/least_watched")
     public List<VideoDTO> leastByViews(@PathVariable String channelInput,
-                                       @PathVariable int limit){
+                                       @RequestParam int limit){
         return videoService.leastViews(channelInput, limit);
     }
 
-    @GetMapping("/{channelInput}/recent/limit={limit}")
+    @GetMapping("/{channelInput}/recent")
     public List<VideoDTO> recentVideos(@PathVariable String channelInput,
-                                       @PathVariable int limit){
+                                       @RequestParam int limit){
         return videoService.recentVideos(channelInput, limit);
     }
-    @GetMapping("/{channelInput}/oldest/limit={limit}")
+    @GetMapping("/{channelInput}/oldest")
     public List<VideoDTO> oldestVideos(@PathVariable String channelInput,
-                                       @PathVariable int limit){
+                                       @RequestParam int limit){
         return videoService.oldestVideos(channelInput, limit);
     }
 
-    @GetMapping("{channelInput}/best_performers/limit={limit}")
+    @GetMapping("{channelInput}/best_performers")
     public List<VideoDTO> bestPerformers(@PathVariable String channelInput,
-                                         @PathVariable int limit){
+                                         @RequestParam int limit){
         return videoService.bestPerformersFromChannelVideos(channelInput, limit);
     }
 
-    @GetMapping("{channelInput}/worst_performers/limit={limit}")
+    @GetMapping("{channelInput}/worst_performers")
     public List<VideoDTO> worstPerformers(@PathVariable String channelInput,
-                                          @PathVariable int limit){
+                                          @RequestParam int limit){
         return videoService.worstPerformersFromChannelVideos(channelInput, limit);
     }
 
 
 
-    @GetMapping("{channelInput}/published_before/date={date}")
+    @GetMapping("{channelInput}/published_before")
     public List<VideoDTO> publishedBefore(@PathVariable String channelInput,
-                                          @PathVariable Instant date){
+                                          @RequestParam Instant date){
         return videoService.publishedBefore(channelInput, date);
     }
 
-    @GetMapping("{channelInput}/published_between/start_date={startDate}/end_date={endDate}")
+    @GetMapping("{channelInput}/published_between")
     public List<VideoDTO> publishedBetween(@PathVariable String channelInput,
-                                          @PathVariable Instant startDate,
-                                           @PathVariable Instant endDate){
+                                           @RequestParam("start_date") Instant startDate,
+                                           @RequestParam("end_date") Instant endDate){
         return videoService.publishedBetween(channelInput, startDate, endDate);
     }
 
-    @GetMapping("{channelInput}/published_after/date={date}")
+    @GetMapping("{channelInput}/published_after")
     public List<VideoDTO> publishedAfter(@PathVariable String channelInput,
-                                          @PathVariable Instant date){
+                                         @RequestParam Instant date){
         return videoService.publishedAfter(channelInput, date);
     }
 
@@ -100,14 +100,14 @@ public class VideoController {
         return videoService.getChannelInsights(channelInput);
     }
 
-    @GetMapping("/trending/region={regionCode}")
-    public List<VideoDTO> trending(@PathVariable String regionCode){
+    @GetMapping("/trending")
+    public List<VideoDTO> trending(@RequestParam("region") String regionCode){
         return videoService.trending(regionCode);
     }
 
-    @GetMapping("/trending/region={regionCode}/category={categoryId}")
-    public List<VideoDTO> trendingInCategory(@PathVariable String regionCode,
-                                   @PathVariable String categoryId){
+    @GetMapping(value = "/trending", params = "category")
+    public List<VideoDTO> trendingInCategory(@RequestParam("region") String regionCode,
+                                             @RequestParam("category") String categoryId){
         return videoService.trendingInCategory(regionCode, categoryId);
     }
 
@@ -116,15 +116,15 @@ public class VideoController {
         return videoService.growth(videoInput);
     }
 
-    @GetMapping("/{videoInput}/days_to_milestone/target={target}")
+    @GetMapping("/{videoInput}/days_to_milestone")
     public double daysToMilestone(@PathVariable String videoInput,
-                                  @PathVariable long target){
+                                  @RequestParam long target){
         return videoService.daysToMilestone(videoInput, target);
     }
 
-    @GetMapping("/{channelInput}/rising_videos/limit={limit}")
+    @GetMapping("/{channelInput}/rising_videos")
     public List<VideoDTO> risingVideos(@PathVariable String channelInput,
-                                       @PathVariable int limit){
+                                       @RequestParam int limit){
         return videoService.risingVideos(channelInput, limit);
     }
 
